@@ -1,0 +1,13 @@
+{
+  "idea_name": "Prodigy",
+  "description": "An AI Counsel that acts as a corporate VP team to validate and plan startup ideas.",
+  "target_user": "Founders, High-Value People, Entrepreneurs",
+  "constraints": {
+    "build_budget_usd": 500,
+    "build_time_weeks": 2
+  },
+  "goals": {
+    "objective": "Validate whether this idea is worth building and get an MVP plan",
+    "time_horizon_months": 2
+  }
+}

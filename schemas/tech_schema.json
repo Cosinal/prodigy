@@ -1,0 +1,31 @@
+{
+  "agent": "string", 
+  "score": "number", 
+  "summary": "string",
+  "details": {
+    "feasibility": {
+      "complexity_level": "string", 
+      "estimated_build_time_weeks": "number", 
+      "estimated_monthly_infra_cost_usd": "number", 
+      "key_technical_challenges": ["string"]
+    },
+    "architecture": {
+      "high_level_components": ["string"], 
+      "models_and_services": ["string"], 
+      "data_flow_summary": "string"
+    },
+    "data_pipeline": {
+      "required_data_sources": ["string"], 
+      "collection_method": "string", 
+      "storage_strategy": "string", 
+      "data_quality_risks": ["string"]
+    },
+    "reliability_and_risk": {
+      "scalability_concerns": ["string"], 
+      "security_privacy_concerns": ["string"], 
+      "operational_failure_modes": ["string"]
+    }
+  },
+  "top_risks": ["string"],
+  "assumptions": ["string"]
+}

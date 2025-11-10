@@ -1,0 +1,14 @@
+{
+  "agent": "string",
+  "overall_headline": "string",
+  "overall_verdict": "string",
+  "overall_score": "number",
+  "dimension_summary": {
+    "market": "string",
+    "tech": "string"
+  },
+  "key_insights": ["string"],
+  "recommended_next_steps": ["string"],
+  "validation_tasks": ["string"],
+  "major_risks_to_watch": ["string"]
+}

@@ -1,0 +1,30 @@
+{
+  "agent": "string",
+  "score": "number",
+  "summary": "string",
+  "details": {
+    "business_model": {
+      "description": "string",
+      "revenue_streams": ["string"],
+      "cost_structure": ["string"]
+    },
+    "pricing_strategy": {
+      "suggested_model": "string",
+      "price_points": ["string"],
+      "rationale": "string"
+    },
+    "unit_economics": {
+      "cac_estimate_usd": "number",
+      "ltv_estimate_usd": "number",
+      "ltv_to_cac_ratio": "number",
+      "breakeven_point_months": "number"
+    },
+    "growth_channels": {
+      "primary_channels": ["string"],
+      "secondary_channels": ["string"],
+      "channel_notes": "string"
+    }
+  },
+  "top_risks": ["string"],
+  "assumptions": ["string"]
+}

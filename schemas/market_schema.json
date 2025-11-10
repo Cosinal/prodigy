@@ -1,0 +1,73 @@
+{
+  "title": "MarketAnalystResult",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "type": "string",
+      "description": "The name or role of the agent producing this report."
+    },
+    "score": {
+      "type": "number",
+      "description": "Market attractiveness score from 0 to 10."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short narrative summary of the market situation."
+    },
+    "details": {
+      "type": "object",
+      "properties": {
+        "tam_sam_som": {
+          "type": "object",
+          "properties": {
+            "tam_description": { "type": "string" },
+            "sam_description": { "type": "string" },
+            "som_focus": { "type": "string" }
+          },
+          "required": ["tam_description", "sam_description", "som_focus"]
+        },
+        "competitive_landscape": {
+          "type": "object",
+          "properties": {
+            "notable_competitors": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "differentiation": { "type": "string" }
+          },
+          "required": ["notable_competitors", "differentiation"]
+        },
+        "trend_insights": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "target_user_profile": {
+          "type": "object",
+          "properties": {
+            "persona": { "type": "string" },
+            "key_pain_points": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": ["persona", "key_pain_points"]
+        }
+      },
+      "required": [
+        "tam_sam_som",
+        "competitive_landscape",
+        "trend_insights",
+        "target_user_profile"
+      ]
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["agent", "score", "summary", "details", "risks", "assumptions"]
+}
