@@ -4,6 +4,7 @@ Evaluates ideas through a bootstrap-to-profitability lens for scrappy founders
 """
 
 import os
+import json
 from typing import Any, Dict, Optional
 
 from core.base_agent import BaseAgent
@@ -270,7 +271,25 @@ class MarketVP(BaseAgent):
     def build_user_prompt(self, project_brief: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> str:
         """
         Turn a project brief dict into a detailed prompt for the Market VP.
+        
+        Handles three modes:
+        1. Normal analysis (no context or empty context)
+        2. Clarification request (from Chief of Staff)
+        3. Re-analysis request (from Devil's Advocate)
         """
+        # Handle clarification requests from Chief of Staff
+        if context and context.get("is_clarification"):
+            return self._build_clarification_prompt(project_brief, context)
+        
+        # Handle re-analysis requests from Devil's Advocate
+        if context and context.get("is_re_analysis"):
+            return self._build_reanalysis_prompt(project_brief, context)
+        
+        # Normal analysis (Market VP runs first, so no upstream context)
+        return self._build_normal_prompt(project_brief)
+    
+    def _build_normal_prompt(self, project_brief: Dict[str, Any]) -> str:
+        """Build prompt for normal market analysis."""
         # Format constraints clearly
         constraints = project_brief.get('constraints', {})
         budget = constraints.get('build_budget_usd', 'Not specified')
@@ -309,6 +328,98 @@ Evaluate this idea through the **bootstrap-to-profitability** lens:
 4. Can you acquire customers for <$100 with ${budget:,} budget + organic tactics?
 
 Respond with a single, valid JSON object. Be specific about the path to first customers and first revenue.
+"""
+        return prompt
+    
+    def _build_clarification_prompt(self, project_brief: Dict[str, Any], context: Dict[str, Any]) -> str:
+        """Build prompt for clarification request from Chief of Staff."""
+        question = context.get("question", "")
+        original_report = context.get("original_report", {})
+        
+        prompt = f"""# Clarification Request
+
+You previously analyzed this startup idea:
+
+**Idea:** {project_brief.get('idea_name')}
+**Description:** {project_brief.get('description')}
+
+**Your Previous Market Analysis:**
+```json
+{json.dumps(original_report, indent=2)}
+```
+
+---
+
+## Chief of Staff Question
+
+The Chief of Staff is synthesizing your report with other VPs and has a clarification question:
+
+**Question:** {question}
+
+---
+
+## Your Task
+
+Please provide a focused response that:
+
+1. **Directly answers the specific question**
+2. **Updates your recommendation if needed** (if the question reveals a gap in your analysis)
+3. **Explains your reasoning** (so COS can synthesize properly)
+
+**Important:**
+- Use the same JSON schema as your original report
+- If you're updating a recommendation, clearly explain why in the summary
+- If your original analysis was correct, reaffirm it with additional detail
+- Be concise - focus on answering the question, not repeating your entire analysis
+
+Respond with a valid JSON object matching your schema.
+"""
+        return prompt
+    
+    def _build_reanalysis_prompt(self, project_brief: Dict[str, Any], context: Dict[str, Any]) -> str:
+        """Build prompt for re-analysis request from Devil's Advocate."""
+        guidance = context.get("devils_advocate_guidance", "")
+        previous_report = context.get("previous_report", {})
+        
+        prompt = f"""# Re-Analysis Request (Devil's Advocate Challenge)
+
+You previously analyzed this startup idea:
+
+**Idea:** {project_brief.get('idea_name')}
+**Description:** {project_brief.get('description')}
+**Target User:** {project_brief.get('target_user')}
+
+**Your Previous Market Analysis:**
+```json
+{json.dumps(previous_report, indent=2)}
+```
+
+---
+
+## Devil's Advocate Challenge
+
+The Devil's Advocate has identified a potential weak assumption in your analysis:
+
+**Guidance for Re-Analysis:**
+{guidance}
+
+---
+
+## Your Task
+
+Re-evaluate your market analysis with this challenge in mind:
+
+1. **Consider the Devil's Advocate's point** - Is there merit to the concern?
+2. **Update your score if warranted** - If the challenge reveals a real weakness, adjust downward
+3. **Revise your recommendations** - If a different approach is better, say so
+4. **Explain your reasoning** - Why did you update (or not update) your analysis?
+
+**Be intellectually honest:**
+- If the Devil's Advocate is right, acknowledge it and revise
+- If your original analysis holds up, explain why the concern isn't critical
+- Focus on helping the founder make the best decision
+
+Respond with a valid JSON object matching your schema.
 """
         return prompt
 
@@ -368,20 +479,21 @@ Keep it concise and actionable for a bootstrapping founder."""
                 - target_user: str
                 - constraints: dict (build_budget_usd, build_time_weeks)
                 - goals: dict (objective, time_horizon_months)
-            context: Optional context (not used by Market VP, but kept for interface consistency)
+            context: Optional context for clarification or re-analysis
         
         Returns:
             Market analysis dict matching schemas/market_schema.json
         """
         # Optional: Get real-time market intelligence from Grok
+        # (Only for normal analysis, not clarifications/re-analysis)
         market_context = ""
-        if self.use_grok:
+        if self.use_grok and (not context or (not context.get("is_clarification") and not context.get("is_re_analysis"))):
             print("[Market VP] Gathering real-time market intelligence via Grok...")
             market_context = self._grok_market_research(project_brief)
             if market_context:
                 print(f"[Market VP] Grok insights: {market_context[:200]}...")
         
-        # Build base user prompt
+        # Build user prompt (handles normal/clarification/re-analysis modes)
         user_prompt = self.build_user_prompt(project_brief, context)
         
         # Add Grok context if available

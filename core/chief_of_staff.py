@@ -1,9 +1,9 @@
-# Chief of Staff module - Enhanced for 5 VPs
+# Chief of Staff module - Enhanced with query_vp capability
 from __future__ import annotations
 
 import os
 import json
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -87,6 +87,42 @@ Rules:
 - Founder should know exactly what to do next after reading this
 """
 
+QUERY_DECISION_PROMPT = """
+You are the Chief of Staff analyzing VP reports. You've noticed potential conflicts or unclear recommendations.
+
+You have the ability to query a specific VP to clarify their recommendation.
+
+Given the current synthesis and VP reports, should you query a VP for clarification?
+
+Respond with JSON:
+{{
+  "should_query": boolean,
+  "vp_name": "market|tech|revenue|ops|product" (if should_query is true),
+  "question": "string (specific question to ask the VP)" (if should_query is true),
+  "reason": "string (why you need this clarification)"
+}}
+
+**When to query:**
+- Clear contradiction between VPs (e.g., Tech says CLI, Product says web UI needed)
+- Unclear implementation path (e.g., Revenue suggests pricing but Tech doesn't specify payment system)
+- Missing critical information (e.g., Market identifies target but Product doesn't address their needs)
+
+**When NOT to query:**
+- Minor differences in opinion (VPs can disagree slightly)
+- Information that can be inferred from context
+- Nice-to-have clarifications (only query what's critical)
+
+**Limit: You can only make 2 queries total, so choose wisely.**
+
+Current VP summaries:
+{vp_summaries}
+
+Current synthesis direction:
+{current_thinking}
+
+Should you query a VP? If yes, which one and what question?
+"""
+
 
 class ChiefOfStaff:
     """
@@ -97,6 +133,7 @@ class ChiefOfStaff:
     - overall score + decision from Orchestrator
     - dimension summaries (from all 5 VPs)
     - full reports (optional, for deeper synthesis)
+    - query_vp_fn (optional, allows querying VPs for clarification)
 
     Returns:
     - Synthesized, founder-facing recommendation JSON
@@ -111,6 +148,7 @@ class ChiefOfStaff:
         overall: Dict[str, Any],
         dimensions: Dict[str, Dict[str, Any]],
         full_reports: Dict[str, Dict[str, Any]] = None,
+        has_query_tool: bool = False,
     ) -> str:
         """Build comprehensive prompt with all VP context."""
         
@@ -173,6 +211,21 @@ class ChiefOfStaff:
                 if risks:
                     prompt += f"- Top Risks: {', '.join(risks)}\n"
             
+            # Clarifications (if any were added from query_vp)
+            if "clarification" in vp:
+                clarification = vp['clarification']
+                # Parse if it's a JSON string
+                if isinstance(clarification, str):
+                    try:
+                        clarification = json.loads(clarification)
+                        # Extract the summary from the clarification
+                        clarification_summary = clarification.get('summary', clarification)
+                    except:
+                        clarification_summary = clarification
+                else:
+                    clarification_summary = clarification
+                prompt += f"- **Clarification:** {clarification_summary}\n"
+            
             prompt += "\n"
 
         # Add key details from full reports if available
@@ -231,24 +284,162 @@ Based on ALL of the above context, synthesize your Chief of Staff counsel.
 3. Prioritize next steps (Week 1-2 actions vs Week 3-8 vs defer to V2)
 4. Be actionable (founder should know exactly what to do after reading this)
 
+"""
+
+        if has_query_tool:
+            prompt += """
+**NOTE:** You have already queried VPs for clarification. Use their clarifications to resolve any tensions.
+
+"""
+
+        prompt += """
 Respond with ONLY valid JSON matching your schema. No additional text.
 """
 
         return prompt
 
-    def analyze(
+    def _detect_conflicts(self, dimensions: Dict[str, Dict[str, Any]]) -> str:
+        """
+        Analyze VP summaries to detect potential conflicts.
+        
+        Returns:
+            Description of conflicts found, or empty string if none
+        """
+        conflicts = []
+        
+        # Check Tech vs Product conflict (CLI vs UI)
+        tech_summary = dimensions.get("tech", {}).get("tech_summary", "").lower()
+        product_summary = dimensions.get("product", {}).get("product_summary", "").lower()
+        
+        if "cli" in tech_summary and ("web" in product_summary or "ui" in product_summary):
+            conflicts.append("Tech VP suggests CLI, but Product VP may prefer web UI")
+        
+        # Check score variance
+        scores = []
+        for key in ["market", "tech", "revenue", "ops", "product"]:
+            score_key = f"{key}_score"
+            score = dimensions.get(key, {}).get(score_key, 0.0)
+            if score:
+                scores.append((key, score))
+        
+        if scores:
+            max_vp, max_score = max(scores, key=lambda x: x[1])
+            min_vp, min_score = min(scores, key=lambda x: x[1])
+            
+            if max_score - min_score > 3.0:
+                conflicts.append(f"{max_vp.title()} scored {max_score} while {min_vp.title()} scored {min_score} - significant disagreement")
+        
+        return "; ".join(conflicts) if conflicts else ""
+
+    def _ask_for_query(
+        self,
+        current_synthesis: Dict[str, Any],
+        dimensions: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Ask COS if it wants to query a VP for clarification.
+        
+        Args:
+            current_synthesis: Current synthesis result
+            dimensions: All VP summaries
+            
+        Returns:
+            Query decision with vp_name and question if should_query is True
+        """
+        conflicts = self._detect_conflicts(dimensions)
+        
+        # If no conflicts detected, skip query
+        if not conflicts:
+            return {"should_query": False}
+        
+        prompt = QUERY_DECISION_PROMPT.format(
+            vp_summaries=json.dumps(dimensions, indent=2),
+            current_thinking=conflicts
+        )
+        
+        response = client.chat.completions.create(
+            model=self.model,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": "You are the Chief of Staff deciding whether to query a VP."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,  # Lower temperature for decision-making
+        )
+        
+        content = response.choices[0].message.content
+        return json.loads(content)
+
+    def synthesize(
         self,
         project: Dict[str, Any],
         overall: Dict[str, Any],
         dimensions: Dict[str, Dict[str, Any]],
         full_reports: Dict[str, Dict[str, Any]] = None,
+        query_vp_fn: Optional[Callable[[str, str], Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
-        Call the LLM with the CoS system prompt + user prompt,
-        and parse the JSON response.
+        Synthesize VP reports with optional VP querying capability.
+        
+        Args:
+            project: Project info
+            overall: Overall score and decision
+            dimensions: VP summaries
+            full_reports: Full VP reports
+            query_vp_fn: Optional function to query VPs (vp_name, question) -> response
+            
+        Returns:
+            Chief of Staff synthesis
         """
-        user_prompt = self._build_user_prompt(project, overall, dimensions, full_reports)
+        # First pass synthesis
+        user_prompt = self._build_user_prompt(
+            project, overall, dimensions, full_reports, has_query_tool=False
+        )
+        
+        initial_synthesis = self._call_llm(user_prompt)
+        
+        # If we have query tool and detect conflicts, allow queries
+        if query_vp_fn:
+            queries_made = 0
+            max_queries = 2
+            
+            while queries_made < max_queries:
+                # Ask COS if it wants to query a VP
+                query_decision = self._ask_for_query(initial_synthesis, dimensions)
+                
+                if not query_decision.get("should_query"):
+                    break
+                
+                vp_name = query_decision.get("vp_name")
+                question = query_decision.get("question")
+                reason = query_decision.get("reason", "")
+                
+                if not vp_name or not question:
+                    break
+                
+                print(f"  🤔 COS querying {vp_name.upper()} VP: {reason}")
+                print(f"     Question: {question[:80]}...")
+                
+                # Execute query
+                clarification = query_vp_fn(vp_name, question)
+                
+                # Add clarification to dimensions
+                if vp_name in dimensions:
+                    dimensions[vp_name]["clarification"] = clarification  # Store as object, not JSON string
+                
+                # Re-synthesize with new information
+                user_prompt = self._build_user_prompt(
+                    project, overall, dimensions, full_reports, has_query_tool=True
+                )
+                initial_synthesis = self._call_llm(user_prompt)
+                
+                queries_made += 1
+                print(f"  ✓ Query {queries_made}/{max_queries} complete")
+        
+        return initial_synthesis
 
+    def _call_llm(self, user_prompt: str) -> Dict[str, Any]:
+        """Call LLM and parse JSON response."""
         response = client.chat.completions.create(
             model=self.model,
             response_format={"type": "json_object"},
@@ -256,11 +447,21 @@ Respond with ONLY valid JSON matching your schema. No additional text.
                 {"role": "system", "content": CHIEF_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.7,  # Balance creativity with consistency
+            temperature=0.7,
         )
 
         content = response.choices[0].message.content
         result = json.loads(content)
-
         result.setdefault("agent", "Chief of Staff")
         return result
+
+    # Legacy method for backward compatibility
+    def analyze(
+        self,
+        project: Dict[str, Any],
+        overall: Dict[str, Any],
+        dimensions: Dict[str, Dict[str, Any]],
+        full_reports: Dict[str, Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Legacy method - calls synthesize without query_vp_fn."""
+        return self.synthesize(project, overall, dimensions, full_reports, query_vp_fn=None)

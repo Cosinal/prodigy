@@ -3,6 +3,7 @@ Product & UX VP Agent
 Evaluates whether people will actually use and love the product
 """
 
+import json
 from typing import Any, Dict, Optional
 
 from core.base_agent import BaseAgent
@@ -454,10 +455,28 @@ class ProductUXVP(BaseAgent):
         """
         Turn a project brief dict into a detailed prompt for the Product & UX VP.
         
-        Args:
-            project_brief: The original project brief
-            context: Optional context from other VPs (market, tech, revenue, ops)
+        Handles three modes:
+        1. Normal analysis with Market context
+        2. Clarification request (from Chief of Staff)
+        3. Re-analysis request (from Devil's Advocate)
         """
+        # Handle clarification requests from Chief of Staff
+        if context and context.get("is_clarification"):
+            return self._build_clarification_prompt(project_brief, context)
+        
+        # Handle re-analysis requests from Devil's Advocate
+        if context and context.get("is_re_analysis"):
+            return self._build_reanalysis_prompt(project_brief, context)
+        
+        # Normal analysis with Market context
+        return self._build_normal_prompt(project_brief, context)
+
+    def _build_normal_prompt(
+        self,
+        project_brief: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Build prompt for normal product analysis with Market context."""
         # Format constraints clearly
         constraints = project_brief.get('constraints', {})
         budget = constraints.get('build_budget_usd', 'Not specified')
@@ -470,83 +489,190 @@ class ProductUXVP(BaseAgent):
         
         prompt = f"""# Startup Idea to Evaluate (Product & UX Lens)
 
-**Idea Name:** {project_brief.get('idea_name', 'Unnamed')}
+    **Idea Name:** {project_brief.get('idea_name', 'Unnamed')}
 
-**Description:** {project_brief.get('description', 'No description provided')}
+    **Description:** {project_brief.get('description', 'No description provided')}
 
-**Target User:** {project_brief.get('target_user', 'Not specified')}
+    **Target User:** {project_brief.get('target_user', 'Not specified')}
 
-**Build Constraints:**
-- Build Budget: ${budget:,} USD (one-time)
-- Build Timeline: {weeks} weeks to MVP
+    **Build Constraints:**
+    - Build Budget: ${budget:,} USD (one-time)
+    - Build Timeline: {weeks} weeks to MVP
 
-**Validation Goals:**
-- Objective: {objective}
-- Timeline: {timeline} months
+    **Validation Goals:**
+    - Objective: {objective}
+    - Timeline: {timeline} months
 
-"""
+    """
         
-        # Add context from other VPs if available
+        # Add context from Market VP (Product VP runs after Market)
         if context:
             prompt += "\n---\n## Context from Other VPs\n\n"
             
-            if 'market' in context:
-                market = context['market']
-                prompt += f"""**Market VP Insights:**
-- Target Persona: {market.get('target_user_profile', {}).get('persona', 'Not specified')}
-- Key Pain Points: {', '.join(market.get('target_user_profile', {}).get('key_pain_points', [])[:2])}
-- Willingness to Pay: Validated in market analysis
-
-"""
-            
-            if 'tech' in context:
-                tech = context['tech']
-                arch = tech.get('architecture', {})
-                prompt += f"""**Tech VP Insights:**
-- Proposed Interface: {arch.get('high_level_components', ['Not specified'])[0] if arch.get('high_level_components') else 'Not specified'}
-- Build Time: {tech.get('feasibility', {}).get('estimated_build_time_weeks', 'Unknown')} weeks
-- Complexity: {tech.get('feasibility', {}).get('complexity_level', 'Unknown')}
-
-"""
-            
-            if 'revenue' in context:
-                revenue = context['revenue']
-                pricing = revenue.get('pricing_strategy', {})
-                prompt += f"""**Revenue VP Insights:**
-- Suggested Pricing: {pricing.get('suggested_model', 'Not specified')}
-- Price Points: {', '.join(pricing.get('price_points', [])[:2])}
-
-"""
-            
-            if 'ops' in context:
-                ops = context['ops']
-                scale = ops.get('scalability_and_maintenance', {})
-                prompt += f"""**Ops VP Insights:**
-- Post-Launch Support: {scale.get('post_launch_support_hours_per_week', 'Unknown')} hours/week
-- Iteration Cycle: {scale.get('iteration_cycle_weeks', 'Unknown')} weeks
-
-"""
+            # Market context is CRITICAL for Product VP
+            if 'market_summary' in context or 'market_details' in context:
+                prompt += "**Market VP Analysis (CRITICAL - Design for THESE users):**\n\n"
+                
+                if 'market_summary' in context:
+                    prompt += f"Market Summary: {context['market_summary']}\n\n"
+                
+                if 'market_details' in context:
+                    market_details = context['market_details']
+                    
+                    # Extract target user persona
+                    target_user = market_details.get('target_user_profile', {})
+                    if target_user.get('persona'):
+                        prompt += f"**Target Persona (from Market VP):**\n{target_user['persona']}\n\n"
+                    
+                    # Extract pain points
+                    pain_points = target_user.get('key_pain_points', [])
+                    if pain_points:
+                        prompt += "**Key Pain Points:**\n"
+                        for pain in pain_points[:3]:
+                            prompt += f"- {pain}\n"
+                        prompt += "\n"
+                    
+                    # Extract SOM focus (first customers)
+                    tam_sam_som = market_details.get('tam_sam_som', {})
+                    if tam_sam_som.get('som_focus'):
+                        prompt += f"**First Customers Strategy:**\n{tam_sam_som['som_focus']}\n\n"
+                
+                prompt += "**IMPORTANT:** Design your product/UX recommendations for THESE SPECIFIC USERS identified by Market VP.\n"
+                prompt += "- If Market identified non-technical users → Don't recommend CLI\n"
+                prompt += "- If Market identified mobile-first users → Don't recommend desktop-only\n"
+                prompt += "- Match interface to actual user technical ability\n\n"
         
         prompt += """---
 
-Evaluate this through the **"will users actually use and love this?"** lens:
+    Evaluate this through the **"will users actually use and love this?"** lens:
 
-**Key questions:**
-1. Does this solve the right problem in the right way for the right user?
-2. Is the proposed interface appropriate for the target persona?
-3. How long until users experience the "aha moment" of core value?
-4. What UX friction points could kill adoption?
-5. Is this validation-ready or does it need more product work?
+    **Key questions:**
+    1. Does this solve the right problem in the right way for the right user?
+    2. Is the proposed interface appropriate for the target persona identified by Market VP?
+    3. How long until users experience the "aha moment" of core value?
+    4. What UX friction points could kill adoption?
+    5. Is this validation-ready or does it need more product work?
 
-**Bootstrap reality check:**
-- MVP needs Usability 7+, Delight 5-6 (not perfection)
-- Function > Form for validation
-- Match interface complexity to user technical ability
-- Time to value must be <10 minutes
+    **Bootstrap reality check:**
+    - MVP needs Usability 7+, Delight 5-6 (not perfection)
+    - Function > Form for validation
+    - Match interface complexity to user technical ability (from Market VP's persona)
+    - Time to value must be <10 minutes
 
-Respond with a single, valid JSON object. Focus on whether users will actually use this and come back for more.
-"""
+    **Interface Selection Guidelines (Based on Market VP's Target Users):**
+    - Technical users (developers, engineers) → CLI is acceptable
+    - Non-technical users (founders, marketers, designers) → Need web UI (Streamlit minimum)
+    - Mobile-first users → Need responsive web app
+    - Enterprise users → Need professional-looking web app
+
+    Respond with a single, valid JSON object. Focus on whether users will actually use this and come back for more.
+    """
         
+        return prompt
+
+    def _build_clarification_prompt(
+        self,
+        project_brief: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> str:
+        """Build prompt for clarification request from Chief of Staff."""
+        question = context.get("question", "")
+        original_report = context.get("original_report", {})
+        
+        prompt = f"""# Clarification Request
+
+    You previously analyzed this startup idea:
+
+    **Idea:** {project_brief.get('idea_name')}
+    **Description:** {project_brief.get('description')}
+
+    **Your Previous Product & UX Analysis:**
+    ```json
+    {json.dumps(original_report, indent=2)}
+    ```
+
+    ---
+
+    ## Chief of Staff Question
+
+    The Chief of Staff is synthesizing your report with other VPs and has a clarification question:
+
+    **Question:** {question}
+
+    ---
+
+    ## Your Task
+
+    Please provide a focused response that:
+
+    1. **Directly answers the specific question**
+    2. **Updates your recommendation if needed** (if the question reveals a conflict with other VPs)
+    3. **Explains your reasoning** (so COS can synthesize properly)
+
+    **Common conflicts to address:**
+    - If Tech VP suggested CLI but Market VP identified non-technical users → Recommend web UI instead
+    - If there's disagreement on interface → Provide clear guidance based on actual user needs
+    - If onboarding complexity is questioned → Clarify what's acceptable for target users
+
+    **Important:**
+    - Use the same JSON schema as your original report
+    - If you're updating a recommendation, clearly explain why in the summary
+    - If your original analysis was correct, reaffirm it with additional detail
+    - Be concise - focus on answering the question, not repeating your entire analysis
+
+    Respond with a valid JSON object matching your schema.
+    """
+        return prompt
+
+    def _build_reanalysis_prompt(
+        self,
+        project_brief: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> str:
+        """Build prompt for re-analysis request from Devil's Advocate."""
+        guidance = context.get("devils_advocate_guidance", "")
+        previous_report = context.get("previous_report", {})
+        
+        prompt = f"""# Re-Analysis Request (Devil's Advocate Challenge)
+
+You previously analyzed this startup idea:
+
+**Idea:** {project_brief.get('idea_name')}
+**Description:** {project_brief.get('description')}
+**Target User:** {project_brief.get('target_user')}
+
+**Your Previous Product & UX Analysis:**
+```json
+{json.dumps(previous_report, indent=2)}
+```
+
+---
+
+## Devil's Advocate Challenge
+
+The Devil's Advocate has identified a potential weak assumption in your analysis:
+
+**Guidance for Re-Analysis:**
+{guidance}
+
+---
+
+## Your Task
+
+Re-evaluate your product & UX analysis with this challenge in mind:
+
+1. **Consider the Devil's Advocate's point** - Is there merit to the UX concern?
+2. **Update your score if warranted** - If the challenge reveals a real UX problem, adjust downward
+3. **Revise your recommendations** - If a different interface or flow is better, say so
+4. **Explain your reasoning** - Why did you update (or not update) your analysis?
+
+**Be intellectually honest:**
+- If the Devil's Advocate is right about UX friction, acknowledge it and revise
+- If your original analysis holds up, explain why the concern isn't critical for MVP
+- Focus on helping the founder build something users will actually use
+
+Respond with a valid JSON object matching your schema.
+"""
         return prompt
 
     def summarize(self, product_report: Dict[str, Any]) -> Dict[str, Any]:
