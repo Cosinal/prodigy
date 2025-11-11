@@ -1,0 +1,178 @@
+{
+    "title": "ProductUXVPResult",
+    "type": "object",
+    "properties": {
+      "agent": {
+        "type": "string",
+        "description": "The name or role of the agent producing this report."
+      },
+      "score": {
+        "type": "number",
+        "description": "Overall Product & UX score from 0 to 10."
+      },
+      "summary": {
+        "type": "string",
+        "description": "Short narrative summary of the product and UX assessment."
+      },
+      "details": {
+        "type": "object",
+        "properties": {
+          "product_definition": {
+            "type": "object",
+            "properties": {
+              "core_value_proposition": {
+                "type": "string",
+                "description": "One-line: What problem does this solve and how?"
+              },
+              "job_to_be_done": {
+                "type": "string",
+                "description": "The functional and emotional job users hire this product for"
+              },
+              "mvp_feature_prioritization": {
+                "type": "object",
+                "properties": {
+                  "must_have": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Core features required for MVP validation"
+                  },
+                  "should_have": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Important but can defer to V2"
+                  },
+                  "could_have": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Nice-to-haves for later versions"
+                  }
+                },
+                "required": ["must_have", "should_have", "could_have"]
+              }
+            },
+            "required": ["core_value_proposition", "job_to_be_done", "mvp_feature_prioritization"]
+          },
+          "user_experience": {
+            "type": "object",
+            "properties": {
+              "interface_recommendation": {
+                "type": "string",
+                "description": "Recommended interface type and rationale"
+              },
+              "core_user_flows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "flow_name": { "type": "string" },
+                    "steps": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "estimated_time_minutes": { "type": "number" },
+                    "friction_points": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "required": ["flow_name", "steps", "estimated_time_minutes", "friction_points"]
+                }
+              },
+              "onboarding_complexity": {
+                "type": "string",
+                "enum": ["Simple", "Moderate", "Complex"],
+                "description": "How hard is it for new users to get started"
+              },
+              "time_to_aha_moment_minutes": {
+                "type": "number",
+                "description": "How long until user experiences core value"
+              }
+            },
+            "required": ["interface_recommendation", "core_user_flows", "onboarding_complexity", "time_to_aha_moment_minutes"]
+          },
+          "persona_validation": {
+            "type": "object",
+            "properties": {
+              "persona_fit_assessment": {
+                "type": "string",
+                "description": "Does the product match the target persona's needs and context?"
+              },
+              "adoption_barriers": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "What might prevent users from adopting"
+              },
+              "motivation_drivers": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "What motivates users to use this"
+              }
+            },
+            "required": ["persona_fit_assessment", "adoption_barriers", "motivation_drivers"]
+          },
+          "pmf_readiness": {
+            "type": "object",
+            "properties": {
+              "usability_score": {
+                "type": "number",
+                "description": "Can users actually use it? (0-10)"
+              },
+              "delight_score": {
+                "type": "number",
+                "description": "Will users love it? (0-10)"
+              },
+              "competitive_ux_assessment": {
+                "type": "string",
+                "description": "How does UX compare to alternatives"
+              },
+              "pmf_signals_to_track": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Qualitative and quantitative signals for PMF"
+              },
+              "ux_risks": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "UX issues that could kill adoption"
+              }
+            },
+            "required": ["usability_score", "delight_score", "competitive_ux_assessment", "pmf_signals_to_track", "ux_risks"]
+          },
+          "design_quality": {
+            "type": "object",
+            "properties": {
+              "minimum_design_standards": {
+                "type": "string",
+                "description": "What level of design quality is needed for MVP"
+              },
+              "recommended_tools": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Bootstrap-friendly design tools and resources"
+              },
+              "accessibility_considerations": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Key accessibility requirements"
+              },
+              "design_expertise_required": {
+                "type": "boolean",
+                "description": "Does this require a designer or can founder handle it?"
+              }
+            },
+            "required": ["minimum_design_standards", "recommended_tools", "accessibility_considerations", "design_expertise_required"]
+          }
+        },
+        "required": ["product_definition", "user_experience", "persona_validation", "pmf_readiness", "design_quality"]
+      },
+      "top_risks": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "assumptions": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "required": ["agent", "score", "summary", "details", "top_risks", "assumptions"]
+  }

@@ -1,14 +1,79 @@
 {
-  "agent": "string",
-  "overall_headline": "string",
-  "overall_verdict": "string",
-  "overall_score": "number",
-  "dimension_summary": {
-    "market": "string",
-    "tech": "string"
+  "title": "ChiefOfStaffResult",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "type": "string",
+      "description": "The name or role of the agent producing this report."
+    },
+    "overall_headline": {
+      "type": "string",
+      "description": "One-sentence TL;DR for the founder"
+    },
+    "overall_verdict": {
+      "type": "string",
+      "description": "Clear recommendation (e.g., 'Proceed with MVP', 'Validate demand first')"
+    },
+    "overall_score": {
+      "type": "number",
+      "description": "Overall score from CEO (0-10)"
+    },
+    "dimension_summary": {
+      "type": "object",
+      "properties": {
+        "market": {
+          "type": "string",
+          "description": "1-2 sentence market summary in plain founder language"
+        },
+        "tech": {
+          "type": "string",
+          "description": "1-2 sentence tech summary in plain founder language"
+        },
+        "revenue": {
+          "type": "string",
+          "description": "1-2 sentence revenue summary in plain founder language"
+        },
+        "ops": {
+          "type": "string",
+          "description": "1-2 sentence operations summary in plain founder language"
+        },
+        "product": {
+          "type": "string",
+          "description": "1-2 sentence product/UX summary in plain founder language"
+        }
+      },
+      "required": ["market", "tech", "revenue", "ops", "product"]
+    },
+    "key_insights": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "3-7 critical takeaways synthesizing across all dimensions"
+    },
+    "recommended_next_steps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "3-7 specific actions the founder should take, prioritized"
+    },
+    "validation_tasks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "2-5 assumptions or questions to test in the real world"
+    },
+    "major_risks_to_watch": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "2-5 most critical risks that could kill or derail the idea"
+    }
   },
-  "key_insights": ["string"],
-  "recommended_next_steps": ["string"],
-  "validation_tasks": ["string"],
-  "major_risks_to_watch": ["string"]
+  "required": [
+    "agent",
+    "overall_headline",
+    "overall_verdict",
+    "overall_score",
+    "dimension_summary",
+    "key_insights",
+    "recommended_next_steps",
+    "validation_tasks",
+    "major_risks_to_watch"
+  ]
 }

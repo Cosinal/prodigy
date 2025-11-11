@@ -1,31 +1,125 @@
 {
-  "agent": "string", 
-  "score": "number", 
-  "summary": "string",
-  "details": {
-    "feasibility": {
-      "complexity_level": "string", 
-      "estimated_build_time_weeks": "number", 
-      "estimated_monthly_infra_cost_usd": "number", 
-      "key_technical_challenges": ["string"]
+  "title": "TechArchitectResult",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "type": "string",
+      "description": "The name or role of the agent producing this report."
     },
-    "architecture": {
-      "high_level_components": ["string"], 
-      "models_and_services": ["string"], 
-      "data_flow_summary": "string"
+    "score": {
+      "type": "number",
+      "description": "Technical feasibility score from 0 to 10."
     },
-    "data_pipeline": {
-      "required_data_sources": ["string"], 
-      "collection_method": "string", 
-      "storage_strategy": "string", 
-      "data_quality_risks": ["string"]
+    "summary": {
+      "type": "string",
+      "description": "Short narrative summary of the technical assessment."
     },
-    "reliability_and_risk": {
-      "scalability_concerns": ["string"], 
-      "security_privacy_concerns": ["string"], 
-      "operational_failure_modes": ["string"]
+    "details": {
+      "type": "object",
+      "properties": {
+        "feasibility": {
+          "type": "object",
+          "properties": {
+            "complexity_level": {
+              "type": "string",
+              "enum": ["Low", "Medium", "High", "Very High"],
+              "description": "Overall complexity assessment"
+            },
+            "estimated_build_time_weeks": {
+              "type": "number",
+              "description": "Realistic build time estimate in weeks"
+            },
+            "estimated_monthly_infra_cost_usd": {
+              "type": "number",
+              "description": "Ongoing monthly infrastructure costs"
+            },
+            "key_technical_challenges": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": [
+            "complexity_level",
+            "estimated_build_time_weeks",
+            "estimated_monthly_infra_cost_usd",
+            "key_technical_challenges"
+          ]
+        },
+        "architecture": {
+          "type": "object",
+          "properties": {
+            "high_level_components": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "models_and_services": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "data_flow_summary": {
+              "type": "string"
+            }
+          },
+          "required": ["high_level_components", "models_and_services", "data_flow_summary"]
+        },
+        "data_pipeline": {
+          "type": "object",
+          "properties": {
+            "required_data_sources": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "collection_method": {
+              "type": "string"
+            },
+            "storage_strategy": {
+              "type": "string"
+            },
+            "data_quality_risks": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": [
+            "required_data_sources",
+            "collection_method",
+            "storage_strategy",
+            "data_quality_risks"
+          ]
+        },
+        "reliability_and_risk": {
+          "type": "object",
+          "properties": {
+            "scalability_concerns": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "security_privacy_concerns": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "operational_failure_modes": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": [
+            "scalability_concerns",
+            "security_privacy_concerns",
+            "operational_failure_modes"
+          ]
+        }
+      },
+      "required": ["feasibility", "architecture", "data_pipeline", "reliability_and_risk"]
+    },
+    "top_risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" }
     }
   },
-  "top_risks": ["string"],
-  "assumptions": ["string"]
+  "required": ["agent", "score", "summary", "details", "top_risks", "assumptions"]
 }
